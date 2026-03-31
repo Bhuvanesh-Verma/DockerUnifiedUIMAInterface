@@ -359,6 +359,88 @@ public interface IDUUIInstantiatedPipelineComponent {
         }
     }
 
+    /**
+     * Calls the training endpoint of a trainable DUUI component.
+     *
+     * @param comp The instantiated component to train
+     * @return Path to the saved model as returned by the endpoint
+     * @throws Exception
+     */
+    static String train(IDUUIInstantiatedPipelineComponent comp) throws Exception {
+        Triplet<IDUUIUrlAccessible, Long, Long> queue = comp.getComponent();
+
+        try {
+            String trainUrl = queue.getValue0().generateURL()
+                    + DUUIComposer.V1_COMPONENT_ENDPOINT_TRAIN;
+
+            System.out.printf("[train] Calling training endpoint: %s%n", trainUrl);
+
+            int tries = 0;
+            HttpResponse<byte[]> resp = null;
+
+            while (tries < postTries) {
+                tries++;
+                try {
+                    HttpRequest request = HttpRequest.newBuilder()
+                            .uri(URI.create(trainUrl))
+                            .timeout(Duration.ofSeconds(
+                                    comp.getPipelineComponent().getTimeout()))
+                            .POST(HttpRequest.BodyPublishers.noBody())
+                            .version(HttpClient.Version.HTTP_1_1)
+                            .build();
+                    resp = _client.sendAsync(request,
+                            HttpResponse.BodyHandlers.ofByteArray()).join();
+                    break;
+                } catch (Exception e) {
+                    System.out.printf(
+                            "Cannot reach train endpoint, retrying %d/%d...%n",
+                            tries, postTries);
+                    try {
+                        Thread.sleep(comp.getPipelineComponent().getTimeout());
+                    } catch (InterruptedException ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            }
+
+            if (resp == null) {
+                throw new IOException(
+                        "Could not reach train endpoint after " + postTries + " tries!");
+            }
+
+            if (resp.statusCode() == 200) {
+                String body = new String(resp.body(), StandardCharsets.UTF_8);
+                // Extract model_path from response JSON
+                // e.g. {"status":"ok","model_path":"/models/berttopic"}
+                String modelPath = extractField(body, "model_path");
+                System.out.printf("[train] Training complete. Model saved at: %s%n",
+                        modelPath);
+                return modelPath;
+            } else {
+                String body = new String(resp.body(), StandardCharsets.UTF_8);
+                throw new InvalidObjectException(String.format(
+                        "[train] Expected response 200, got %d: %s",
+                        resp.statusCode(), body));
+            }
+
+        } finally {
+            comp.addComponent(queue.getValue0());
+        }
+    }
+
+    /**
+     * Lightweight JSON field extractor.
+     */
+    private static String extractField(String json, String field) {
+        String key = "\"" + field + "\"";
+        int idx = json.indexOf(key);
+        if (idx < 0) return null;
+        int colon = json.indexOf(":", idx);
+        int start = json.indexOf("\"", colon) + 1;
+        int end = json.indexOf("\"", start);
+        return json.substring(start, end);
+    }
+
     DUUIPipelineComponent getPipelineComponent();
 
     Triplet<IDUUIUrlAccessible, Long, Long> getComponent();
