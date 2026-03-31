@@ -699,4 +699,15 @@ public class DUUIPipelineComponent {
         return Long.valueOf(_parameters.getOrDefault(timeout, "60"));
     }
 
+    private boolean trainable = false;
+
+    public DUUIPipelineComponent withTrainable(boolean trainable) {
+        this.trainable = trainable;
+        return this;
+    }
+
+    public boolean isTrainable() {
+        return trainable;
+    }
+
 }

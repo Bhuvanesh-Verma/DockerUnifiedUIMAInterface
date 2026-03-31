@@ -23,18 +23,20 @@ import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.net.URISyntaxException;
 import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.nio.file.Path;
 import java.security.InvalidParameterException;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
-
+import java.net.URI;
 /**
  *
  * @author Alexander Leonhardt
  */
-public class DUUIRemoteDriver implements IDUUIDriverInterface {
+public class DUUIRemoteDriver implements IDUUIDriverInterface, DUUITrainableComponent {
     private final HashMap<String, InstantiatedComponent> _components;
     private final HttpClient _client;
     private IDUUIConnectionHandler _wsclient = null;
@@ -404,6 +406,24 @@ public class DUUIRemoteDriver implements IDUUIDriverInterface {
         } else {
             IDUUIInstantiatedPipelineComponent.process(aCas, comp, perf);
         }
+    }
+
+    @Override
+    public boolean isTrainable(String uuid) {
+        InstantiatedComponent comp = _components.get(uuid);
+        if (comp == null) return false;
+        return comp.getPipelineComponent().isTrainable();
+    }
+
+    @Override
+    public String finalizeTrain(String uuid) throws Exception {
+        InstantiatedComponent comp = _components.get(uuid);
+        if (comp == null) {
+            throw new InvalidParameterException(
+                    "The given uuid was not instantiated by the remote driver");
+        }
+
+        return IDUUIInstantiatedPipelineComponent.train(comp);
     }
 
     public boolean destroy(String uuid) {

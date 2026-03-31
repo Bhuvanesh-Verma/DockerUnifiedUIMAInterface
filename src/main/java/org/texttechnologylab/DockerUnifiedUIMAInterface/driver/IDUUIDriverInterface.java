@@ -101,6 +101,21 @@ public interface IDUUIDriverInterface {
     void run(String uuid, JCas aCas, DUUIPipelineDocumentPerformance perf, DUUIComposer composer) throws CASException, PipelineComponentException, CompressorException, IOException, InterruptedException, SAXException, CommunicationLayerException;
 
     /**
+     * Called after all documents have been processed for components that
+     * support training. Triggers the training endpoint and returns the
+     * path to the saved model.
+     *
+     * Default implementation does nothing, returns null.
+     *
+     * @param uuid UUID of the instantiated component
+     * @return Path to the saved model, or null if not applicable
+     * @throws Exception
+     */
+    default String finalizeTrain(String uuid) throws Exception {
+        return null;
+    }
+
+    /**
      * Destruction of a component
      *
      * @param uuid

@@ -759,6 +759,7 @@ public class DUUIComposer {
     public static final String V1_COMPONENT_ENDPOINT_PROCESS_WEBSOCKET = "/v1/process_websocket";
     public static final String V1_COMPONENT_ENDPOINT_TYPESYSTEM = "/v1/typesystem";
     public static final String V1_COMPONENT_ENDPOINT_COMMUNICATION_LAYER = "/v1/communication_layer";
+    public static final String V1_COMPONENT_ENDPOINT_TRAIN = "/v1/train";
 
     public static List<IDUUIConnectionHandler> _clients = new ArrayList<>(); // Saves Websocket-Clients.
     private boolean _connection_open = false; // Let connection open for multiple consecutive use.
@@ -1281,6 +1282,31 @@ public class DUUIComposer {
                 _storage.finalizeRun(name, starttime, Instant.now());
             }
             System.out.println("[Composer] All threads returned.");
+
+            System.out.println("[Composer] Checking for trainable components...");
+            for (PipelinePart part : _instantiatedPipeline) {
+                IDUUIDriverInterface driver = part.getDriver();
+                // Only call finalizeTrain if the driver and component support it
+                if (driver instanceof DUUITrainableComponent trainable
+                        && trainable.isTrainable(part.getUUID())) {
+                    try {
+                        String modelPath = driver.finalizeTrain(part.getUUID());
+                        if (modelPath != null) {
+                            addEvent(
+                                    DUUIEvent.Sender.COMPOSER,
+                                    String.format("Training complete. Model saved at: %s", modelPath)
+                            );
+                        }
+                    } catch (Exception e) {
+                        addEvent(
+                                DUUIEvent.Sender.COMPOSER,
+                                String.format("Training finalization failed: %s", e.getMessage()),
+                                DebugLevel.ERROR
+                        );
+                        if (!ignoreErrors) throw e;
+                    }
+                }
+            }
             shutdown_pipeline();
         } catch (Exception e) {
             e.printStackTrace();
